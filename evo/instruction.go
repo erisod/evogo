@@ -3,6 +3,7 @@ package evo
 import (
 	"math/rand"
 	"time"
+	"strconv"
 )
 
 const NOOP = 0;
@@ -31,6 +32,48 @@ type Instruction struct {
 	p4 int
 }
 
+func (i *Instruction) getDesc() string {
+
+	var desc string
+	var longdesc string
+
+	switch i.operation {
+	case NOOP:
+		desc = "noop"
+		longdesc = "do nothing"
+	case JUMP:
+		desc = "jump " + strconv.Itoa(i.p1)
+		longdesc = "jump to code" + strconv.Itoa(i.p1)
+	case ADDLEQ:
+		desc = "addleq " + strconv.Itoa(i.p1) + " " + strconv.Itoa(i.p2) + " " + strconv.Itoa(i.p3)
+		longdesc = "mem" + strconv.Itoa(i.p1) + "+= mem" + strconv.Itoa(i.p2) + "; if mem" + strconv.Itoa(i.p1) + " <= 0 jump to code" + strconv.Itoa(i.p3)
+	case DECNZJ:
+		desc = "decnzj " + strconv.Itoa(i.p1) + " " + strconv.Itoa(i.p2) + " " + strconv.Itoa(i.p3)
+		longdesc = "mem" + strconv.Itoa(i.p1) + "-= mem" + strconv.Itoa(i.p2) + "; if mem" + strconv.Itoa(i.p1) + " !=0 jump to code" + strconv.Itoa(i.p3)
+	case INCEQ:
+		desc = "inceq " + strconv.Itoa(i.p1) + " " + strconv.Itoa(i.p2) + " " + strconv.Itoa(i.p3)
+		longdesc = "mem" + strconv.Itoa(i.p1) + "++; if mem" + strconv.Itoa(i.p1) + "==mem" + strconv.Itoa(i.p2) + " jump to code" + strconv.Itoa(i.p3)
+	case COPYRES:
+		desc = "copyres " + strconv.Itoa(i.p1) + " " + strconv.Itoa(i.p2)
+		longdesc = "output" + strconv.Itoa(i.p2) + "=mem" + strconv.Itoa(i.p1)
+	case SETVAL:
+		desc = "setval " + strconv.Itoa(i.p1) + " " + strconv.Itoa(i.p2)
+		longdesc = "mem" + strconv.Itoa(i.p1) + "=" + strconv.Itoa(i.p2)
+	case ENDEXEC:
+		desc = "endexec"
+		longdesc = "stop program"
+	case COPYIN:
+		desc = "copyin " + strconv.Itoa(i.p1) + " " + strconv.Itoa(i.p2)
+		longdesc = "mem" + strconv.Itoa(i.p2) + "=input" + strconv.Itoa(i.p1)
+	default:
+		desc = "invalid(op" + strconv.Itoa(i.operation) + ")"
+		longdesc = "invalid operation code " + strconv.Itoa(i.operation)
+	}
+
+	desc = desc + "\t(" + longdesc + ")"
+	return desc
+}
+
 func (i *Instruction) noop() bool {
 	if i.operation == NOOP {
 		return true
@@ -47,8 +90,8 @@ func (i *Instruction) valid() bool {
 	return true
 }
 
-func (i *Instruction) Copy() *Instruction {
-	newins := new(Instruction)
+func (i *Instruction) Copy() Instruction {
+	newins := Instruction{}
 
 	newins.operation = i.operation
 	newins.p1 = i.p1
@@ -59,10 +102,10 @@ func (i *Instruction) Copy() *Instruction {
 	return newins
 }
 
-func NewRandomInstruction() *Instruction {
+func NewRandomInstruction() Instruction {
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 
-	ins := new(Instruction)
+	ins := Instruction{}
 	ins.operation = rng.Intn(MAX_OPERATION)
 	ins.p1 = rng.Intn(MAX_PARAM - MIN_PARAM) + MIN_PARAM
 	ins.p2 = rng.Intn(MAX_PARAM - MIN_PARAM) + MIN_PARAM
@@ -72,8 +115,8 @@ func NewRandomInstruction() *Instruction {
 	return ins
 }
 
-func NewMutantInstruction(*Instruction) *Instruction {
-	ins := new(Instruction)
+func NewMutantInstruction(parent Instruction) Instruction {
+	ins := parent.Copy()
 
 	mutationOdds := 1000 // e.g. 1 in mutationOdds.
 

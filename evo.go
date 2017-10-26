@@ -1,8 +1,16 @@
 package main
 
-import "github.com/erisod/evo/evo"
+import (
+	"github.com/erisod/evogo/evo"
+	"fmt"
+)
 
 func main() {
-	problem := evo.AdditionProblem{}
+	var problem evo.AdditionProblem
+
 	e := evo.NewEvolver(problem)
+
+	e.RunAndReport()
+
+	fmt.Println("all done")
 }

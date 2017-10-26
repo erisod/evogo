@@ -11,7 +11,7 @@ import (
 type Evolver struct {
 	forms []Form
 
-	problem Problem
+	problem ProblemInterface
 
 	// Is the problem solved (may be inefficient).
 	solved bool
@@ -29,40 +29,49 @@ type Evolver struct {
 	topScore float64
 }
 
-const MAXFORMS = 10000
+const MAXFORMS = 100
 const STABILITYDURATION = 1000
-const RACETRIALS = 50
+const RACETRIALS = 10
 
-func NewEvolver(p Problem) Evolver {
+func NewEvolver(p ProblemInterface) Evolver {
 	e := Evolver{}
 	e.solved = false
 	e.solvedNStable = false
 	e.topScore = -math.MaxFloat64
-	e.forms = make([]Form, MAXFORMS)
+	e.forms = []Form{}
 
-	for i:=0 ; i < MAXFORMS ; i++ {
-		e.forms[i] = *NewRandomForm()
+	for _ = range [MAXFORMS] struct{}{} {
+		e.forms = append(e.forms, NewRandomForm())
 	}
+
+	fmt.Println("I made a new Evolver! with", len(e.forms),"forms")
+	fmt.Println("form 0 has ", len(e.forms[0].instructions), "instructions")
 
 	e.problem = p
 
 	return e
 }
 
-func (e Evolver) mutateForms() {
-	// Take the top 10% of forms and duplicate them into new slots.
-	topN := int(float32(len(e.forms)) * .1)
-	newForms := make([]Form, len(e.forms))
+func (e *Evolver) mutateForms() {
+	// Take the top N% of forms and duplicate them into new slots.
+
+	var topPct float32 = 10
+
+	topN := int(float32(len(e.forms)) * float32(topPct/100))
+	newForms := []Form{}
+	newPerTop := int(float32(MAXFORMS)/float32(topN))
 
 	for i:=0; i< topN; i++ {
-		nf := NewChildForm(&(e.forms[i]), true)
-		newForms = append(newForms, *nf)
+		for j:=0; j < newPerTop; j++ {
+			nf := NewChildForm(e.forms[i], true)
+			newForms = append(newForms, nf)
+		}
 	}
 
 	e.forms = newForms
 }
 
-func (e Evolver) runIteration() {
+func (e *Evolver) runIteration() {
 	// TODO: Is there a cleaner way of doing this loop?
 	for _ = range [RACETRIALS] struct{}{} {
 		problemInput := e.problem.GenerateInputs()
@@ -77,12 +86,12 @@ func (e Evolver) runIteration() {
 
 }
 
-func (e Evolver) sortFormsByAvgScore() {
+func (e *Evolver) sortFormsByAvgScore() {
 	// TODO: Understand this better; it feels backwards.
 	sort.Sort(sort.Reverse(ByAvgScore(e.forms)))
 }
 
-func (e Evolver) doBookKeeping() {
+func (e *Evolver) doBookKeeping() {
 	// Relies on the forms being reverse sorted by avgscore
 	runTopScore := e.forms[0].AvgScore()
 	e.lastTopScore = runTopScore
@@ -98,14 +107,19 @@ func (e Evolver) doBookKeeping() {
 }
 
 // Run the evolution until complete (or FOREVER) and report status via stdout.
-func (e Evolver) runAndReport() {
+func (e *Evolver) RunAndReport() {
 	for i:=0 ; ; i++ {
+		fmt.Println("Starting iteration", i)
 		e.runIteration()
 		e.sortFormsByAvgScore()
 		e.doBookKeeping()
 
 		fmt.Println("Iteration ",i," complete.  runTopScore : ", e.lastTopScore)
+		fmt.Println("Best form:")
+		e.forms[0].Print()
+
 		if e.solvedNStable {
+			fmt.Println("Stable solution!")
 			break
 		}
 

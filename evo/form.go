@@ -4,22 +4,18 @@ import (
 	"time"
 	"math/rand"
 	"fmt"
+	"strconv"
 )
 
 type Form struct {
-	instructions []*Instruction
+	instructions []Instruction
 	mem          []int
 	input        []int
 	output       []int
 
-	codesize int
-	memsize  int
-	iosize   int
-
 	finished bool
 	opsleft  int
 
-	avgScore float64
 	scoreSum float64
 	runCount int
 
@@ -27,38 +23,64 @@ type Form struct {
 	cp int
 }
 
-const CODESIZE = 200
+const CODESIZE = 20
 const MEMSIZE = 10
 const IOSIZE = 10
-const MAXOPS = 100
+const MAXOPS = 10
 
-func (f *Form) Print() {
-	fmt.Println("Printing Form ---- ")
-	fmt.Printf("%+v\n", *f)
+
+func (f *Form) Description() string {
+	var desc string
+
+	desc += "Input:\n"
+	for i:=0; i<len(f.input); i++ {
+		desc += "  input[" + strconv.Itoa(i) + "] = " + strconv.Itoa(f.input[i]) + "\n"
+	}
+	desc += "Code:\n"
+	for i:=0; i<len(f.instructions); i++ {
+		desc += "  " + strconv.Itoa(i) + " : " + f.instructions[i].getDesc() + "\n"
+	}
+	desc += "Output:\n"
+	for i:=0; i<len(f.output); i++ {
+		desc += "  output[" + strconv.Itoa(i) + "] = " + strconv.Itoa(f.output[i]) + "\n"
+	}
+	desc += "Stats:\n"
+	desc += "  AvgScore: " + fmt.Sprintf("%f", f.AvgScore()) + "\n"
+	desc += "  RunCount: " + strconv.Itoa(f.runCount) + "\n"
+
+	return desc
+	
 }
 
-func NewRandomForm() *Form {
-	f := new(Form)
+func (f *Form) Print() {
+	fmt.Println(f.Description())
+	// fmt.Printf("%+v\n", f) // Print raw struct.
+}
+
+func NewRandomForm() Form {
+	f := Form{}
 	f.init()
 
-	for i := 0; i < CODESIZE; i++ {
-		f.instructions[i] = NewRandomInstruction()
+	for i:=0; i < CODESIZE; i++ {
+		f.instructions = append(f.instructions, NewRandomInstruction())
 	}
 
 	return f
 }
 
 // Create a new form based on a parent.  Mutation optional.
-func NewChildForm(parent *Form, mutate bool) *Form {
-	f := new(Form)
+func NewChildForm(parent Form, mutate bool) Form {
+	f := Form{}
 	f.init()
+
+	f.instructions = make([]Instruction, CODESIZE)
 
 	pPos := 0
 	cPos := 0
 
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 
-	for pPos < CODESIZE && cPos < CODESIZE {
+	for pPos < len(parent.instructions) && cPos < len(f.instructions) {
 
 		// Normal instruction copy with mutation.
 		if (mutate) {
@@ -77,8 +99,8 @@ func NewChildForm(parent *Form, mutate bool) *Form {
 	}
 
 	// Fill reminder of child with random instructions
-	for cPos < CODESIZE {
-		f.instructions[cPos] = NewRandomInstruction()
+	for ; cPos < CODESIZE ; cPos++ {
+		f.instructions = append(f.instructions, NewRandomInstruction())
 	}
 
 	return f
@@ -91,7 +113,6 @@ func (f *Form) AvgScore() float64{
 func (f *Form) init() {
 	f.output = make([]int, IOSIZE)
 	f.mem = make([]int, MEMSIZE)
-	f.instructions = make([]*Instruction, CODESIZE, CODESIZE)
 
 	f.reset()
 }
@@ -101,8 +122,12 @@ func (f *Form) reset() {
 	f.finished = false
 	f.opsleft = MAXOPS
 
-	for i := 0; i < IOSIZE; i++ {
+	for i := 0; i < len(f.output) ; i++ {
 		f.output[i] = 0;
+	}
+
+	for i := 0; i < len(f.mem) ; i++ {
+		f.mem[i] = 0;
 	}
 }
 
@@ -192,7 +217,6 @@ func (f *Form) inceq() {
 	} else {
 		f.cp++
 	}
-
 }
 
 func (f *Form) subleq() {
@@ -232,7 +256,7 @@ func (f *Form) endexec() {
 }
 
 
-
+// Sorter for Form.
 type ByAvgScore []Form
 func (f ByAvgScore) Len() int {
 	return len(f)
@@ -241,7 +265,6 @@ func (f ByAvgScore) Swap(i, j int) {
 	f[i], f[j] = f[j], f[i]
 }
 func (f ByAvgScore) Less(i, j int) bool {
-
 	return f[i].AvgScore() < f[j].AvgScore()
 }
 
