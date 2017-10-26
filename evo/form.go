@@ -1,8 +1,6 @@
 package evo
 
 import (
-	"time"
-	"math/rand"
 	"fmt"
 	"strconv"
 )
@@ -18,15 +16,17 @@ type Form struct {
 
 	scoreSum float64
 	runCount int
+	costSum float64
 
 	// Code pointer.
 	cp int
 }
 
-const CODESIZE = 20
+const CODESIZE = 10
 const MEMSIZE = 10
 const IOSIZE = 10
 const MAXOPS = 10
+const MUTATIONRATE = 50
 
 
 func (f *Form) Description() string {
@@ -34,19 +34,22 @@ func (f *Form) Description() string {
 
 	desc += "Input:\n"
 	for i:=0; i<len(f.input); i++ {
-		desc += "  input[" + strconv.Itoa(i) + "] = " + strconv.Itoa(f.input[i]) + "\n"
+			desc += "  input[" + strconv.Itoa(i) + "] = " + strconv.Itoa(f.input[i]) + "\n"
 	}
 	desc += "Code:\n"
 	for i:=0; i<len(f.instructions); i++ {
-		desc += "  " + strconv.Itoa(i) + " : " + f.instructions[i].getDesc() + "\n"
+			desc += "  " + strconv.Itoa(i) + " : " + f.instructions[i].getDesc() + "\n"
 	}
-	desc += "Output:\n"
+	desc += "Output (zeros suppressed):\n"
 	for i:=0; i<len(f.output); i++ {
-		desc += "  output[" + strconv.Itoa(i) + "] = " + strconv.Itoa(f.output[i]) + "\n"
+		if f.output[i] != 0 {
+			desc += "  output[" + strconv.Itoa(i) + "] = " + strconv.Itoa(f.output[i]) + "\n"
+		}
 	}
 	desc += "Stats:\n"
 	desc += "  AvgScore: " + fmt.Sprintf("%f", f.AvgScore()) + "\n"
 	desc += "  RunCount: " + strconv.Itoa(f.runCount) + "\n"
+	desc += "  AvgCost: " + fmt.Sprintf("%f", f.AvgCost()) + "\n"
 
 	return desc
 	
@@ -56,6 +59,31 @@ func (f *Form) Print() {
 	fmt.Println(f.Description())
 	// fmt.Printf("%+v\n", f) // Print raw struct.
 }
+
+func NewNoopForm() Form {
+	f := Form{}
+	f.init()
+
+	for i:=0; i < CODESIZE; i++ {
+		f.instructions = append(f.instructions, Instruction{})
+	}
+
+	return f
+}
+
+
+// A form which copies input0 to output0 (for testing).
+func NewCopyForm() Form {
+	f := Form{}
+	f.init()
+
+	f.instructions = append(f.instructions, Instruction{ operation:COPYIN})
+	f.instructions = append(f.instructions, Instruction{ operation:COPYRES})
+	f.instructions = append(f.instructions, Instruction{ operation:ENDEXEC})
+
+	return f
+}
+
 
 func NewRandomForm() Form {
 	f := Form{}
@@ -78,8 +106,6 @@ func NewChildForm(parent Form, mutate bool) Form {
 	pPos := 0
 	cPos := 0
 
-	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
-
 	for pPos < len(parent.instructions) && cPos < len(f.instructions) {
 
 		// Normal instruction copy with mutation.
@@ -90,8 +116,12 @@ func NewChildForm(parent Form, mutate bool) Form {
 		}
 
 		// Skip or duplicate some of parent.
-		if (mutate && rng.Intn(CODESIZE) == 0) {
+		if (mutate && rng.Intn(MUTATIONRATE) == 0) {
 			pPos = rng.Intn(CODESIZE)
+		}
+		// Overwrite or skip part of child.
+		if (mutate && rng.Intn(MUTATIONRATE) == 0) {
+			cPos = rng.Intn(CODESIZE)
 		}
 
 		pPos++
@@ -108,6 +138,10 @@ func NewChildForm(parent Form, mutate bool) Form {
 
 func (f *Form) AvgScore() float64{
 	return f.scoreSum / float64(f.runCount)
+}
+
+func (f *Form) AvgCost() float64{
+	return f.costSum / float64(f.runCount)
 }
 
 func (f *Form) init() {
@@ -131,8 +165,13 @@ func (f *Form) reset() {
 	}
 }
 
-func (f *Form) runCode(newInput []int) {
-	f.input = newInput
+func (f *Form) resetStats() {
+	f.costSum = 0.0
+	f.runCount = 0.0
+}
+
+func (f *Form) runCode(newInput *[]int) {
+	f.input = *newInput
 
 	f.reset()
 
@@ -150,16 +189,19 @@ func (f *Form) step() {
 
 	defer func() {
 		if r := recover(); r != nil {
-			fmt.Println("RECOVERING ", r)
+			// fmt.Println("RECOVERING ", r)
 			f.finished = true
 		}
 	}()
 
 	op := f.instructions[f.cp].operation
 
+	f.costSum += 1.0
+
 	switch op {
 	case NOOP:
 		f.cp++
+		f.costSum -= 0.9 // Count a noop as a discount operation.
 	case JUMP:
 		f.jump()
 	case ADDLEQ:
@@ -177,6 +219,7 @@ func (f *Form) step() {
 	case COPYIN:
 		f.copyFromInput()
 	default:
+		// Invalid operations end the program.
 		f.endexec()
 	}
 }
@@ -256,7 +299,8 @@ func (f *Form) endexec() {
 }
 
 
-// Sorter for Form.
+// Sorter for Form; highest scores first; if scores both zero
+// sort by lower cost.
 type ByAvgScore []Form
 func (f ByAvgScore) Len() int {
 	return len(f)
@@ -265,6 +309,9 @@ func (f ByAvgScore) Swap(i, j int) {
 	f[i], f[j] = f[j], f[i]
 }
 func (f ByAvgScore) Less(i, j int) bool {
-	return f[i].AvgScore() < f[j].AvgScore()
+	if f[i].AvgScore() == 0.0 && f[j].AvgScore() == 0.0 {
+		return f[i].AvgCost() < f[j].AvgCost()
+	}
+	return f[i].AvgScore() > f[j].AvgScore()
 }
 

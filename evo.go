@@ -5,6 +5,8 @@ import (
 	"fmt"
 )
 
+// Global random number generator.
+
 func main() {
 	var problem evo.AdditionProblem
 

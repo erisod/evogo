@@ -20,18 +20,21 @@ type Evolver struct {
 	solvedNStable bool
 
 	// Count of times the same top score has been produced.
-	sameSolvedTopScoreCount int
+	sameSolvedCostCount int
 
 	// Most recent topScore
 	lastTopScore float64
 
 	// Highest ever topScore
 	topScore float64
+
+	// Best ever (lowest) cost
+	lastTopCost float64
 }
 
-const MAXFORMS = 100
-const STABILITYDURATION = 1000
-const RACETRIALS = 10
+const MAXFORMS = 20000
+const STABILITYDURATION = 500
+const RACETRIALS = 20
 
 func NewEvolver(p ProblemInterface) Evolver {
 	e := Evolver{}
@@ -41,28 +44,37 @@ func NewEvolver(p ProblemInterface) Evolver {
 	e.forms = []Form{}
 
 	for _ = range [MAXFORMS] struct{}{} {
-		e.forms = append(e.forms, NewRandomForm())
+		// Create random value or noop (all zero) initial forms.
+		// e.forms = append(e.forms, NewRandomForm())
+		e.forms = append(e.forms, NewNoopForm())
+		// e.forms = append(e.forms, NewCopyForm())
 	}
-
-	fmt.Println("I made a new Evolver! with", len(e.forms),"forms")
-	fmt.Println("form 0 has ", len(e.forms[0].instructions), "instructions")
 
 	e.problem = p
 
 	return e
 }
 
+// Mutate forms by allocating an all new set of forms based on
+// the top N% best performing forms.
 func (e *Evolver) mutateForms() {
 	// Take the top N% of forms and duplicate them into new slots.
 
-	var topPct float32 = 10
+	var topPct float32 = 20
 
-	topN := int(float32(len(e.forms)) * float32(topPct/100))
+	// TODO: Clean up this type wrangling; I was having some debugger issues here and wanted
+	// to inspect intermediate values with prints.
+	topNFloat := float32(len(e.forms)) * float32(topPct)/100.0
+	topN := int(topNFloat)
 	newForms := []Form{}
 	newPerTop := int(float32(MAXFORMS)/float32(topN))
 
 	for i:=0; i< topN; i++ {
-		for j:=0; j < newPerTop; j++ {
+		// Copy one intact.
+		nf := NewChildForm(e.forms[i], false)
+		newForms = append(newForms, nf)
+
+		for j:=1; j < newPerTop; j++ {
 			nf := NewChildForm(e.forms[i], true)
 			newForms = append(newForms, nf)
 		}
@@ -77,7 +89,7 @@ func (e *Evolver) runIteration() {
 		problemInput := e.problem.GenerateInputs()
 		problemAnswer := e.problem.Answer(problemInput)
 		for i := 0; i < len(e.forms); i++ {
-			e.forms[i].runCode(problemInput)
+			e.forms[i].runCode(&problemInput)
 			e.forms[i].runCount++
 			runScore := e.problem.Score(problemAnswer, e.forms[i].output)
 			e.forms[i].scoreSum += runScore
@@ -88,7 +100,7 @@ func (e *Evolver) runIteration() {
 
 func (e *Evolver) sortFormsByAvgScore() {
 	// TODO: Understand this better; it feels backwards.
-	sort.Sort(sort.Reverse(ByAvgScore(e.forms)))
+	sort.Sort(ByAvgScore(e.forms))
 }
 
 func (e *Evolver) doBookKeeping() {
@@ -97,26 +109,39 @@ func (e *Evolver) doBookKeeping() {
 	e.lastTopScore = runTopScore
 	if (runTopScore == 0.0) {
 		e.solved = true
-		if e.topScore == runTopScore {
-			e.sameSolvedTopScoreCount++
-			if e.sameSolvedTopScoreCount >= STABILITYDURATION {
+		runTopCost := e.forms[0].AvgCost()
+		if e.lastTopCost == runTopCost {
+			e.sameSolvedCostCount++
+			if e.sameSolvedCostCount >= STABILITYDURATION {
 				e.solvedNStable = true
 			}
+		} else {
+			e.sameSolvedCostCount = 0
 		}
+
+		e.lastTopCost = runTopCost
 	}
+
+	e.topScore = math.Min(e.topScore, runTopScore)
 }
 
 // Run the evolution until complete (or FOREVER) and report status via stdout.
 func (e *Evolver) RunAndReport() {
 	for i:=0 ; ; i++ {
-		fmt.Println("Starting iteration", i)
 		e.runIteration()
 		e.sortFormsByAvgScore()
 		e.doBookKeeping()
 
-		fmt.Println("Iteration ",i," complete.  runTopScore : ", e.lastTopScore)
-		fmt.Println("Best form:")
-		e.forms[0].Print()
+		if (i % 10 == 0) {
+			fmt.Println("Best form:")
+			e.forms[0].Print()
+
+			if e.solved {
+				fmt.Println("--Solved--  Stable for", e.sameSolvedCostCount, "iterations")
+			}
+		}
+
+		fmt.Println("Iteration ", i, " complete.  runTopScore : ", e.forms[0].AvgScore(), "cost:", e.forms[0].AvgCost())
 
 		if e.solvedNStable {
 			fmt.Println("Stable solution!")

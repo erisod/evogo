@@ -118,27 +118,23 @@ func NewRandomInstruction() Instruction {
 func NewMutantInstruction(parent Instruction) Instruction {
 	ins := parent.Copy()
 
-	mutationOdds := 1000 // e.g. 1 in mutationOdds.
-
-	maybeMutate(&ins.operation, mutationOdds)
-	maybeMutate(&ins.p1, mutationOdds)
-	maybeMutate(&ins.p2, mutationOdds)
-	maybeMutate(&ins.p3, mutationOdds)
-	maybeMutate(&ins.p4, mutationOdds)
+	maybeMutate(&ins.operation, MUTATIONRATE)
+	maybeMutate(&ins.p1, MUTATIONRATE)
+	maybeMutate(&ins.p2, MUTATIONRATE)
+	maybeMutate(&ins.p3, MUTATIONRATE)
+	maybeMutate(&ins.p4, MUTATIONRATE)
 
 	return ins
 }
 
 func maybeMutate(value *int, mutationOdds int) {
-	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
-
-	// Increment value mutation.
-	if rng.Intn(mutationOdds) == 0 {
+	// Increment/decrement value mutation.
+	if rng.Intn(MUTATIONRATE) == 0 {
 		*value += rng.Intn(MAX_OPERATION * 2) - MAX_OPERATION;
 	}
 
 	// Sign flip mutation.
-	if rng.Intn(mutationOdds) == 0 {
+	if rng.Intn(MUTATIONRATE) == 0 {
 		*value = - *value
 	}
 }

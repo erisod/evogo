@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"sort"
+	"github.com/stretchr/testify/require"
 )
 
 // Check basic form copy operation and ensure modification to parent post-copy
@@ -38,7 +40,7 @@ func TestFormProgramIOCopy(t *testing.T) {
 	f.instructions[2].operation = ENDEXEC
 
 	input := []int{66, 77, 88}
-	f.runCode(input)
+	f.runCode(&input)
 
 	assert.Equal(t, 66, f.output[0])
 }
@@ -66,7 +68,7 @@ func TestFormProgramInvalidRange(t *testing.T) {
 	f.instructions[4].operation = ENDEXEC
 
 	input := []int{66, 77, 88}
-	f.runCode(input)
+	f.runCode(&input)
 
 	assert.Equal(t, 66, f.output[0])
 }
@@ -74,4 +76,49 @@ func TestFormProgramInvalidRange(t *testing.T) {
 func TestFormPrint(t *testing.T) {
 	f := NewRandomForm()
 	f.Print()
+}
+
+func TestFormSort(t *testing.T) {
+	f1 := NewNoopForm()
+	f2 := NewNoopForm()
+	f3 := NewNoopForm()
+
+	// Using opsleft to identify forms easily.
+	f1.opsleft=1
+	f2.opsleft=2
+	f3.opsleft=3
+
+	f1.costSum=11.0
+	f2.costSum=5.0
+	f3.costSum=2.0
+
+	f1.runCount = 1
+	f2.runCount = 1
+	f3.runCount = 1
+
+	f1.scoreSum=-5
+	f2.scoreSum=-3
+	f3.scoreSum=-4
+
+	forms := []Form{f1, f2, f3}
+	// Sanity check.
+	require.Equal(t, 1, forms[0].opsleft)
+
+
+	// Test function.
+	sort.Sort(ByAvgScore(forms))
+
+	// Lowest score should be first.
+	require.Equal(t, 2, forms[0].opsleft)
+
+	f1.scoreSum=0.0
+	f2.scoreSum=0.0
+	f3.scoreSum=0.0
+	forms = []Form{f1, f2, f3}
+
+	// Test function.
+	sort.Sort(ByAvgScore(forms))
+
+	// Lowest cost should be first.
+	require.Equal(t, 3, forms[0].opsleft)
 }

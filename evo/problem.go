@@ -69,10 +69,10 @@ func (p Problem) Score(correct []int, actual []int) float64 {
 	return -gap
 }
 
+var rng *rand.Rand = rand.New(rand.NewSource(time.Now().UnixNano()))
+
 // For most problems we can generate all random inputs.
 func (p Problem) GenerateInputs() []int {
-	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
-
 	input := make([]int, 10)
 
 	input[0] = rng.Intn(PROBLEM_INPUT_RANGE * 2) - PROBLEM_INPUT_RANGE
