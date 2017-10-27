@@ -16,9 +16,12 @@ type ProblemInterface interface {
 type Problem struct {}
 
 type AdditionProblem struct { Problem }
+type MultiplyProblem struct { Problem }
 type SubtractionProblem struct { Problem }
 type CopyProblem struct { Problem }
 type Copy3Problem struct { Problem }
+type Output1Problem struct { Problem }
+
 
 const PROBLEM_INPUT_RANGE = 200 // +- this value.
 
@@ -26,6 +29,20 @@ const PROBLEM_INPUT_RANGE = 200 // +- this value.
 func (p AdditionProblem) Answer(input []int) []int {
 	answer := make([]int, 1)
 	answer[0] = input[0] + input[1]
+	return answer
+}
+
+// Output 1 to output0.
+func (p Output1Problem) Answer(input []int) []int {
+	answer := make([]int, 1)
+	answer[0] = 1
+	return answer
+}
+
+// Multiply problem.
+func (p MultiplyProblem) Answer(input []int) []int {
+	answer := make([]int, 1)
+	answer[0] = input[0] * input[1]
 	return answer
 }
 

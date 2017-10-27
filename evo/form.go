@@ -16,7 +16,7 @@ type Form struct {
 
 	scoreSum float64
 	runCount int
-	costSum float64
+	costSum int
 
 	// Code pointer.
 	cp int
@@ -141,7 +141,7 @@ func (f *Form) AvgScore() float64{
 }
 
 func (f *Form) AvgCost() float64{
-	return f.costSum / float64(f.runCount)
+	return float64(f.costSum) / float64(f.runCount)
 }
 
 func (f *Form) init() {
@@ -166,8 +166,8 @@ func (f *Form) reset() {
 }
 
 func (f *Form) resetStats() {
-	f.costSum = 0.0
-	f.runCount = 0.0
+	f.costSum = 0
+	f.runCount = 0
 }
 
 func (f *Form) runCode(newInput *[]int) {
@@ -196,12 +196,12 @@ func (f *Form) step() {
 
 	op := f.instructions[f.cp].operation
 
-	f.costSum += 1.0
+	f.costSum += 10
 
 	switch op {
 	case NOOP:
 		f.cp++
-		f.costSum -= 0.9 // Count a noop as a discount operation.
+		f.costSum -= 9 // Count a noop as a discount operation.
 	case JUMP:
 		f.jump()
 	case ADDLEQ:
@@ -216,6 +216,7 @@ func (f *Form) step() {
 		f.setval()
 	case ENDEXEC:
 		f.endexec()
+		f.costSum -= 10 // Count endexec as free.
 	case COPYIN:
 		f.copyFromInput()
 	default:

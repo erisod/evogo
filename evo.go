@@ -8,7 +8,7 @@ import (
 // Global random number generator.
 
 func main() {
-	var problem evo.AdditionProblem
+	var problem evo.Output1Problem
 
 	e := evo.NewEvolver(problem)
 

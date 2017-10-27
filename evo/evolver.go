@@ -32,7 +32,7 @@ type Evolver struct {
 	lastTopCost float64
 }
 
-const MAXFORMS = 20000
+const MAXFORMS = 10000
 const STABILITYDURATION = 500
 const RACETRIALS = 20
 
@@ -62,8 +62,6 @@ func (e *Evolver) mutateForms() {
 
 	var topPct float32 = 20
 
-	// TODO: Clean up this type wrangling; I was having some debugger issues here and wanted
-	// to inspect intermediate values with prints.
 	topNFloat := float32(len(e.forms)) * float32(topPct)/100.0
 	topN := int(topNFloat)
 	newForms := []Form{}
@@ -74,6 +72,7 @@ func (e *Evolver) mutateForms() {
 		nf := NewChildForm(e.forms[i], false)
 		newForms = append(newForms, nf)
 
+		// And the remainder as mutations
 		for j:=1; j < newPerTop; j++ {
 			nf := NewChildForm(e.forms[i], true)
 			newForms = append(newForms, nf)
@@ -83,8 +82,44 @@ func (e *Evolver) mutateForms() {
 	e.forms = newForms
 }
 
+
+// Scan over buckets of forms and mutate the best into the other slots of
+// that bucket.  Vary the bucket size so as to allow mixing between buckets.
+func (e *Evolver) mutateFormsBucketStrategy() {
+	var buckets int = rng.Intn(2) + 10 // Between 10 and 12 buckets.
+
+	var bucketLength int = len(e.forms) / buckets
+
+	for i:=0; i < buckets; i++ {
+		topInBucket := i*bucketLength
+		for j:=1; j < bucketLength; j++ {
+			// Find the best in the bucket.
+
+			// Using the Less() component of the sorter.
+			if (ByAvgScore(e.forms).Less(i*bucketLength+j, topInBucket)) {
+				topInBucket = i*bucketLength + j
+			}
+		}
+		// Move the best one to the first position (overwrite is fine).
+		e.forms[i*bucketLength] = e.forms[topInBucket]
+		fmt.Println("Best score in bucket", i, " : ", e.forms[i*bucketLength].AvgScore(), " cost : ", e.forms[i*bucketLength].AvgCost())
+
+		e.forms[i*bucketLength].resetStats()
+
+		// Mutate the first position one over the remainder slots in the bucket.
+		for j:=1; j < bucketLength; j++ {
+			e.forms[i*bucketLength+j] = NewChildForm(e.forms[i*bucketLength+j], true)
+		}
+
+	}
+}
+
+
+
+
+
 func (e *Evolver) runIteration() {
-	// TODO: Is there a cleaner way of doing this loop?
+	// TODO: Is there a cleaner way of doing this loop without a named variable?
 	for _ = range [RACETRIALS] struct{}{} {
 		problemInput := e.problem.GenerateInputs()
 		problemAnswer := e.problem.Answer(problemInput)
@@ -128,8 +163,9 @@ func (e *Evolver) doBookKeeping() {
 // Run the evolution until complete (or FOREVER) and report status via stdout.
 func (e *Evolver) RunAndReport() {
 	for i:=0 ; ; i++ {
+
 		e.runIteration()
-		e.sortFormsByAvgScore()
+		// e.sortFormsByAvgScore()
 		e.doBookKeeping()
 
 		if (i % 10 == 0) {
@@ -148,6 +184,7 @@ func (e *Evolver) RunAndReport() {
 			break
 		}
 
-		e.mutateForms()
+		e.mutateFormsBucketStrategy()
+		// e.mutateForms()
 	}
 }
